@@ -34,11 +34,30 @@ Later, we do big data analysis on the data to find out:
 	pip install sleekxmpp
 ```
 
+* virtualenv wrapper
+```
+    wget http://pypi.python.org/packages/source/v/virtualenvwrapper/virtualenvwrapper-3.6.tar.gz
+    python setup.py install
+    or 
+    pip install virtualenvwrapper
+
+    echo `source /usr/local/bin/virtualenvwrapper.sh >> ~/.bashrc'
+
+    mkvirtualenv teamplay
+    workon teamplay
+    pip install xleekxmpp
+    pip install schedule
+
+```
+
 * start
-``` (./TeamBot.py &)`
+```
+    (./TeamBot.py &)
 ```
 
 * kill the lingering script
 ``` javascript
     for p in $(ps -ef | grep TeamBot | awk '{print $2}'); do kill -9 $p; done`
+    or
+    pkill -f TeamBot
 ```

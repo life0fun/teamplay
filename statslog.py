@@ -21,16 +21,16 @@ class StatsLog(object):
         self.consolelogger.propagate = False
         self.consolelogger.debug(text)
 
-    def getLogFileHandler(self, coreid, level=logging.DEBUG):
-        handler = logging.FileHandler(self.logRootDir + coreid)
+    def getLogFileHandler(self, name, level=logging.DEBUG):
+        handler = logging.FileHandler(self.logRootDir + name)
         handler.setLevel(level)
         formatter = logging.Formatter(fmt=StatsLog.formatter, datefmt=StatsLog.datefmt)
         handler.setFormatter(formatter)
         return handler
 
-    def logFile(self, coreid, text):
-        self.stafflogger = logging.getLogger(coreid)
-        staffhandler = self.getLogFileHandler(coreid)
+    def logFile(self, name, text):
+        self.stafflogger = logging.getLogger(name)
+        staffhandler = self.getLogFileHandler(name)
         self.stafflogger.addHandler(staffhandler)
         #self.stafflogger.propagate = False    # prevent from propagate to upper logger(console)
         self.stafflogger.debug(text)
@@ -40,7 +40,7 @@ class StatsLog(object):
 def unitTest():
     slog = StatsLog()
     slog.logConsole('hello world')
-    slog.logFile('e51141', 'hello world')
+    slog.logFile('haijin', 'hello world')
 
 if __name__ == '__main__':
     unitTest()

@@ -31,14 +31,14 @@ else:
 sched = Scheduler()
 sched.start()
 
-""" 
-    configuration info 
+"""
+    configuration info
 """
 class TeamConfiguration(object):
     def __init__(self, configfile='team.cfg'):
         self.parser = SafeConfigParser()
         self.parser.read(configfile)
-    
+
     def getGtalkServer(self):
         return self.parser.get('bot', 'gtalk')
 
@@ -50,7 +50,7 @@ class TeamConfiguration(object):
         return self.parser.items('team_member')
 
     def useProxy(self):
-        return True if self.parser.get('proxy', 'use_proxy') in ['true', '1', 't', 'y', 'yes'] else False 
+        return True if self.parser.get('proxy', 'use_proxy') in ['true', '1', 't', 'y', 'yes'] else False
 
     def getProxyInfo(self):
         return self.parser.get('proxy', 'proxy_host'), \
@@ -76,25 +76,25 @@ class TeamConfiguration(object):
             return None
         return q
 
-""" 
-    this class encap staff state 
+"""
+    this class encap staff state
 """
 class StaffState(object):
     def __init__(self):
         ''' the state incl  question, time '''
-        self.staffstate = {}   
-    
-    def getQuestionState(self, coreid):
-        return self.staffstate.get(coreid).get('question')
+        self.staffstate = {}
 
-    def updateQuestionState(self, coreid, qidx):
-        self.staffstate.setdefault(coreid, {}).update(dict({'question':qidx}))
+    def getQuestionState(self, name):
+        return self.staffstate.get(name).get('question')
 
-    def updateTimeState(self, coreid, tot):
-        self.staffstate.setdefault(coreid, {}).update(dict({'time':tot}))
+    def updateQuestionState(self, name, qidx):
+        self.staffstate.setdefault(name, {}).update(dict({'question':qidx}))
 
-""" 
-    Bot the periodically send collect stats msg to staff list 
+    def updateTimeState(self, name, tot):
+        self.staffstate.setdefault(name, {}).update(dict({'time':tot}))
+
+"""
+    Bot the periodically send collect stats msg to staff list
 """
 class TeamBot(sleekxmpp.ClientXMPP):
     #GtalkServer = '74.125.142.125'
@@ -105,7 +105,7 @@ class TeamBot(sleekxmpp.ClientXMPP):
 
         self.Jid, self.Password = self.configuration.getBotId()
 
-        sleekxmpp.ClientXMPP.__init__(self, self.Jid, self.Password) 
+        sleekxmpp.ClientXMPP.__init__(self, self.Jid, self.Password)
 
         self.register_plugin('xep_0030') # Service Discovery
         self.register_plugin('xep_0199') # XMPP Ping
@@ -150,16 +150,15 @@ class TeamBot(sleekxmpp.ClientXMPP):
     def connectToGtalk(self):
         gtalk = self.configuration.getGtalkServer()
         self.use_proxy = self.configuration.useProxy()
-        #if not self.use_proxy:
-        #    raise AssertionError, 'use proxy wrong'
-        
-        h,p,u,pwd = self.configuration.getProxyInfo()
-
-        self.proxy_config = {
-            'host': h,
-            'port': int(p),
-            'username': u,
-            'password': pwd}
+        if self.use_proxy:
+            print 'use proxy', self.use_proxy
+            #raise AssertionError, 'use proxy wrong'
+            h,p,u,pwd = self.configuration.getProxyInfo()
+            self.proxy_config = {
+                'host': h,
+                'port': int(p),
+                'username': u,
+                'password': pwd}
 
         if self.connect((gtalk, 5222), True, True, False):
             self.process(block=True)
@@ -167,6 +166,7 @@ class TeamBot(sleekxmpp.ClientXMPP):
         else:
             print("Unable to connect.")
 
+    """ the main entry point of bot logic """
     def sessionStart(self, event):
         """
         Process the session_start event.
@@ -182,21 +182,24 @@ class TeamBot(sleekxmpp.ClientXMPP):
         hour = self.configuration.getHour()
         minute = self.configuration.getMinute()
 
+        # add schedule cron job
         sched.add_cron_job(self.collectStats, day_of_week=day, hour=hour, minute=minute)
 
         # Using wait=True ensures that the send queue will be
         # emptied before ending the session.
         #self.disconnect(wait=True)
+        self.collectStats()
 
     #@sched.cron_schedule(day_of_week='mon-sat', hour='10-17', minute=12)
     def collectStats(self):
         memlist = self.configuration.getTeamMember()
-        for k,v in memlist:
-            self.staffstate.updateQuestionState(k, '1')   # first question
-            self.sendMsg(v, self.configuration.getQuestion('1'))
+        for name,jid in memlist:
+            self.staffstate.updateQuestionState(name, '1')   # first question
+            self.sendMsg(jid, self.configuration.getQuestion('1'))
 
+    # send msg to jid
     def sendMsg(self, toid, msg):
-        self.logger.logConsole('sending : ' + toid + ' : ' + msg)
+        self.logger.logConsole('sending msg to : ' + toid + ' : ' + msg)
         self.send_message(mto=toid, mbody=msg, mtype='chat')
 
     def message(self, msg):
@@ -234,8 +237,8 @@ class TeamBot(sleekxmpp.ClientXMPP):
                 msg.reply("Thanks for sending status!\n%(body)s" % msg).send()
         return cb
 
-    def getNextQuestion(self, coreid):
-        qidx = int(self.staffstate.getQuestionState(coreid))
+    def getNextQuestion(self, name):
+        qidx = int(self.staffstate.getQuestionState(name))
         return str(qidx+1), self.configuration.getQuestion(str(qidx+1))
 
 if __name__ == '__main__':
@@ -254,13 +257,12 @@ if __name__ == '__main__':
                     action='store_const', dest='loglevel',
                     const=5, default=logging.INFO)
 
-    optp.add_option("-p", "--password", dest="password", help="password to wwwgate0")
-
+    optp.add_option("-p", "--password", dest="password", help="password to proxy")
 
     opts, args = optp.parse_args()
 
-    if opts.password is None:
-        opts.password = getpass.getpass("wwwgate0 Password, or return for default: ")
+    #if opts.password is None:
+    #    opts.password = getpass.getpass("wwwgate0 Password, or return for default: ")
 
     # Setup logging.
     logging.basicConfig(level=opts.loglevel, format='%(levelname)-8s %(message)s')
